@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 dark:bg-gray-950 dark:text-gray-100;
+    font-family:
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 dark:bg-gray-800/60 backdrop-blur-xl border border-white/30 dark:border-gray-700/20
+           shadow-[0_8px_32px_rgba(0,0,0,0.06)];
+  }
+
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]
+           border border-slate-100 dark:border-gray-700
+           hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-shadow duration-300;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-violet-600 to-indigo-600
+           hover:from-violet-700 hover:to-indigo-700
+           text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200
+           shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40
+           active:scale-95 cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-100 dark:bg-gray-700 hover:bg-slate-200 dark:hover:bg-gray-600
+           text-slate-700 dark:text-gray-200 font-semibold py-2.5 px-6 rounded-xl
+           transition-all duration-200 active:scale-95 cursor-pointer
+           border border-slate-200 dark:border-gray-600;
+  }
+
+  .btn-success {
+    @apply bg-gradient-to-r from-emerald-500 to-teal-500
+           hover:from-emerald-600 hover:to-teal-600
+           text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200
+           shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40
+           active:scale-95 cursor-pointer;
+  }
+
+  .btn-warning {
+    @apply bg-gradient-to-r from-amber-500 to-orange-500
+           hover:from-amber-600 hover:to-orange-600
+           text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200
+           shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40
+           active:scale-95 cursor-pointer;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-gray-600
+           bg-white dark:bg-gray-700 text-slate-800 dark:text-gray-100
+           placeholder-slate-400 dark:placeholder-gray-500
+           focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400
+           focus:border-transparent
+           transition-all duration-200
+           shadow-sm;
+  }
+
+  /* Badge styles */
+  .badge-pending {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300;
+  }
+
+  .badge-active {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300;
+  }
+
+  .badge-suspended {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300;
+  }
+
+  .badge-premium {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300;
+  }
+
+  .badge-free {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300;
+  }
+
+  /* Custom Animations for Toasts */
+  .animate-toast-in {
+    animation: toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-1rem) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Fade in animation */
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(1rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Pulse glow */
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes glow {
+    from { box-shadow: 0 0 20px rgba(124, 58, 237, 0.15); }
+    to { box-shadow: 0 0 40px rgba(124, 58, 237, 0.35); }
+  }
+}
