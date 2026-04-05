@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { X, Maximize2, Minimize2, BookOpen } from 'lucide-react';
+import { resolveBackendUrl } from '../services/urlHelper';
 
 export default function PdfReaderModal({ pdfUrl, title, onClose }) {
   const containerRef = useRef(null);
@@ -37,10 +38,7 @@ export default function PdfReaderModal({ pdfUrl, title, onClose }) {
 
   if (!pdfUrl) return null;
 
-  // Normalize: ensure we always use a relative path so the Vite proxy handles it
-  const resolvedUrl = pdfUrl.startsWith('http')
-    ? new URL(pdfUrl).pathname
-    : pdfUrl;
+  const resolvedUrl = resolveBackendUrl(pdfUrl);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">

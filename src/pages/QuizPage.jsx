@@ -6,6 +6,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import {
   getQuestionsByChapter, getChapter, saveProgress, telemetryQuizAttempt
 } from '../services/api';
+import { resolveBackendUrl } from '../services/urlHelper';
 import {
   CheckCircle2, XCircle, ChevronRight, BookOpen,
   ChevronLeft, ChevronRightIcon, FileText,
@@ -390,7 +391,7 @@ export default function QuizPage() {
       <div ref={pdfWrapperRef} className="flex-1 relative bg-gray-200/50 dark:bg-gray-900 overflow-hidden min-h-0">
         <div className="absolute inset-0 overflow-auto flex items-start justify-center p-4 custom-scrollbar">
           <Document
-            file={chapter.manual?.pdfUrl}
+            file={resolveBackendUrl(chapter.manual?.pdfUrl)}
             onLoadSuccess={async (pdfDoc) => {
               setPdfProxy(pdfDoc);
               setNumPages(pdfDoc.numPages);
