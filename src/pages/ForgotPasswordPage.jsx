@@ -1,22 +1,27 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { GraduationCap, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { forgotPassword } from '../services/api';
+import ReCaptcha, { resetCaptchaRef } from '../components/ReCaptcha';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [sent, setSent]         = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await forgotPassword(email);
+      await forgotPassword(email, captchaToken);
       setSent(true);
     } catch {
       toast.error('Ocurrió un error. Inténtalo de nuevo.');
+      resetCaptchaRef(captchaRef);
+      setCaptchaToken('');
     } finally {
       setLoading(false);
     }
@@ -73,10 +78,19 @@ export default function ForgotPasswordPage() {
                     className="input-field pl-10"
                   />
                 </div>
+
+                <div className="pt-1">
+                  <ReCaptcha
+                    captchaRef={captchaRef}
+                    onVerify={(token) => setCaptchaToken(token)}
+                    onExpire={() => setCaptchaToken('')}
+                  />
+                </div>
+
                 <button
                   id="btn-send-reset"
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !captchaToken}
                   className="btn-primary w-full flex items-center justify-center gap-2"
                 >
                   {loading ? <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> : null}

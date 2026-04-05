@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, approveUser, suspendUser } from '../../services/api';
+import { getUsers, getUsersStats, createUser, updateUser, deleteUser, approveUser, activateMembership, deactivateMembership } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import { Plus, Pencil, Trash2, Check, Shield, User, X, CheckCircle, Clock, Ban, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, Shield, User, X, CheckCircle, Clock, Ban, ChevronLeft, ChevronRight, MessageCircle, Zap, Users, UserCheck, Infinity as InfinityIcon, Calendar, CalendarDays } from 'lucide-react';
+import Tooltip from '../../components/Tooltip';
 
-const emptyUserForm = { name: '', email: '', password: '', role: 'USER' };
+const emptyUserForm = { name: '', email: '', password: '', role: 'USER', accessType: '' };
 
 function Modal({ title, onClose, children }) {
   return (
@@ -23,9 +24,11 @@ function Modal({ title, onClose, children }) {
 
 function StatusBadge({ status }) {
   const config = {
-    ACTIVE:    { icon: CheckCircle, label: 'Activo',     cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    PENDING:   { icon: Clock,       label: 'Pendiente',  cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-    SUSPENDED: { icon: Ban,         label: 'Suspendido', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+    ACTIVE:           { icon: CheckCircle, label: 'Activo',     cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    PENDING_APPROVAL: { icon: Clock,       label: 'Pendiente Aprob.',  cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+    PENDING_PAYMENT:  { icon: Clock,       label: 'Pendiente Pago',  cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+    INACTIVE:         { icon: Ban,         label: 'Inactivo', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+    SUSPENDED:        { icon: Ban,         label: 'Suspendido', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
   };
   const c = config[status] || config.ACTIVE;
   const Icon = c.icon;
@@ -39,6 +42,7 @@ function StatusBadge({ status }) {
 export default function UsersManager() {
   const toast = useToast();
   const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -50,6 +54,10 @@ export default function UsersManager() {
   const [editData, setEditData] = useState(null);
   const [form, setForm] = useState(emptyUserForm);
 
+  const [showActivateModal, setShowActivateModal] = useState(false);
+  const [activateTarget, setActivateTarget] = useState(null);
+  const [activateType, setActivateType] = useState('THIRTY_DAYS');
+
   useEffect(() => {
     fetchUsers();
   }, [page]);
@@ -57,7 +65,15 @@ export default function UsersManager() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await getUsers(page, PAGE_SIZE);
+      const [res, statsRes] = await Promise.all([
+        getUsers(page, PAGE_SIZE),
+        getUsersStats().catch(() => ({ data: null }))
+      ]);
+      
+      if (statsRes && statsRes.data) {
+        setStats(statsRes.data);
+      }
+      
       // Spring Page object: { content, totalPages, totalElements, ... }
       const data = res.data;
       if (Array.isArray(data)) {
@@ -85,7 +101,7 @@ export default function UsersManager() {
 
   const openEdit = (u) => {
     setEditData(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role });
+    setForm({ name: u.name, email: u.email, password: '', role: u.role, accessType: u.accessType || '' });
     setShowModal(true);
   };
 
@@ -117,24 +133,51 @@ export default function UsersManager() {
     }
   };
 
-  const handleApprove = async (id) => {
+  const handleWhatsApp = async (u) => {
     try {
-      await approveUser(id);
-      toast.success('Usuario aprobado');
+      await approveUser(u.id);
+      fetchUsers();
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al aprobar usuario en BD');
+      return;
+    }
+    
+    const bankData = import.meta.env.VITE_BANK_DATA || "Banco: [TU BANCO] / Cuenta: [VISTA/CORRIENTE] / Número: [NÚMERO] / RUT: [TU RUT] / Email: [TU EMAIL]";
+    let text = `Hola ${u.name}, tu solicitud para 'Voy a pasar' fue aceptada. Para activar tu mes de acceso, realiza la transferencia a: ${bankData}. Envía el comprobante por aquí.`;
+    
+    let phoneNum = u.phone || '';
+    if (phoneNum && !phoneNum.startsWith('56')) phoneNum = '56' + phoneNum;
+    if (!phoneNum) {
+      toast.error('El usuario no tiene número de teléfono registrado.');
+      return;
+    }
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const url = isMobile ? `whatsapp://send?phone=${phoneNum}&text=${encodeURIComponent(text)}` : `https://web.whatsapp.com/send?phone=${phoneNum}&text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleDeactivate = async (id) => {
+    if (!window.confirm('¿Desactivar este usuario? Perderá acceso.')) return;
+    try {
+      await deactivateMembership(id);
+      toast.success('Usuario desactivado');
       fetchUsers();
     } catch {
-      toast.error('Error al aprobar usuario');
+      toast.error('Error al desactivar usuario');
     }
   };
 
-  const handleSuspend = async (id) => {
-    if (!window.confirm('¿Suspender este usuario?')) return;
+  const handleActivateSubmit = async (e) => {
+    e.preventDefault();
     try {
-      await suspendUser(id);
-      toast.success('Usuario suspendido');
+      await activateMembership(activateTarget.id, activateType);
+      toast.success('Membresía activada');
+      setShowActivateModal(false);
       fetchUsers();
     } catch {
-      toast.error('Error al suspender usuario');
+      toast.error('Error al activar membresía');
     }
   };
 
@@ -147,7 +190,59 @@ export default function UsersManager() {
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="space-y-6">
+      {/* Resumen/Stats Monitor */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="card p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 flex items-center justify-center">
+              <UserCheck size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Activos</p>
+              <h4 className="text-2xl font-bold">{stats.active}</h4>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 flex items-center justify-center">
+              <Clock size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Pendiente Aprob.</p>
+              <h4 className="text-2xl font-bold">{stats.pending}</h4>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 flex items-center justify-center">
+              <Ban size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Suspendidos</p>
+              <h4 className="text-2xl font-bold">{stats.suspended}</h4>
+            </div>
+          </div>
+          <div className="card p-4 flex flex-col justify-center">
+            <p className="text-sm text-gray-500 font-medium mb-2 border-b border-gray-100 pb-1">Desglose Activos</p>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="flex items-center gap-1 text-gray-600"><InfinityIcon size={12}/> Perm.</span>
+                <span className="font-semibold">{stats.permanent}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="flex items-center gap-1 text-gray-600"><CalendarDays size={12}/> 30 Días</span>
+                <span className="font-semibold">{stats.thirtyDays}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="flex items-center gap-1 text-gray-600"><Calendar size={12}/> 1 Día</span>
+                <span className="font-semibold">{stats.oneDay}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla de Usuarios */}
+      <div className="card overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
         <h2 className="font-bold text-gray-900 dark:text-white">Usuarios ({totalElements})</h2>
@@ -161,15 +256,15 @@ export default function UsersManager() {
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-gray-700/50">
             <tr>
-              {['ID', 'Nombre', 'Email', 'Rol', 'Estado', 'Acciones'].map((h) => (
+              {['ID', 'Nombre', 'Email', 'Rol', 'Activación', 'Estado', 'Acciones'].map((h) => (
                 <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {users.map((u) => (
+            {users.map((u, index) => (
               <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
-                <td className="px-5 py-3 text-sm text-gray-500">#{u.id}</td>
+                <td className="px-5 py-3 text-sm text-gray-500">#{page * PAGE_SIZE + index + 1}</td>
                 <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">{u.name}</td>
                 <td className="px-5 py-3 text-sm text-gray-600 dark:text-gray-300">{u.email}</td>
                 <td className="px-5 py-3">
@@ -178,40 +273,78 @@ export default function UsersManager() {
                   </span>
                 </td>
                 <td className="px-5 py-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {u.accessType === 'ONE_DAY' ? '1 Día' : u.accessType === 'THIRTY_DAYS' ? '30 Días' : u.accessType === 'PERMANENT' ? 'Permanente' : <span className="text-gray-400">N/A</span>}
+                    </span>
+                    {u.expirationDate && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Vence: {new Date(u.expirationDate).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-5 py-3">
                   <StatusBadge status={u.accountStatus || 'ACTIVE'} />
                 </td>
                 <td className="px-5 py-3">
-                  <div className="flex gap-1.5">
-                    {/* Approve — only show for PENDING/SUSPENDED users */}
-                    {(u.accountStatus === 'PENDING' || u.accountStatus === 'SUSPENDED') && (
-                      <button onClick={() => handleApprove(u.id)} title="Aprobar"
-                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition">
-                        <CheckCircle size={15} />
-                      </button>
+                  <div className="flex gap-1.5 flex-wrap max-w-[140px]">
+                    {/* WhatsApp Approve — PENDING_APPROVAL */}
+                    {u.accountStatus === 'PENDING_APPROVAL' && (
+                      <Tooltip text="Aprobar y contactar por WhatsApp">
+                        <button onClick={() => handleWhatsApp(u)}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition">
+                          <MessageCircle size={15} />
+                        </button>
+                      </Tooltip>
                     )}
-                    {/* Suspend — only show for ACTIVE users */}
-                    {(u.accountStatus === 'ACTIVE' || !u.accountStatus) && u.role !== 'ADMIN' && (
-                      <button onClick={() => handleSuspend(u.id)} title="Suspender"
-                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition">
-                        <Ban size={15} />
-                      </button>
+                    {/* Confirm Payment — PENDING_PAYMENT */}
+                    {u.accountStatus === 'PENDING_PAYMENT' && (
+                      <Tooltip text="Confirmar pago del estudiante">
+                        <button onClick={() => { setActivateTarget(u); setShowActivateModal(true); }}
+                                className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                          <Zap size={15} />
+                        </button>
+                      </Tooltip>
                     )}
-                    <button onClick={() => openEdit(u)} title="Editar"
-                            className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition">
-                      <Pencil size={15} />
-                    </button>
+                    {/* Deactivate — ACTIVE */}
+                    {u.accountStatus === 'ACTIVE' && u.role !== 'ADMIN' && (
+                      <Tooltip text="Desactivar acceso permanentemente">
+                        <button onClick={() => handleDeactivate(u.id)}
+                                className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition">
+                          <Ban size={15} />
+                        </button>
+                      </Tooltip>
+                    )}
+                    {/* Reactivate from INACTIVE or SUSPENDED */}
+                    {(u.accountStatus === 'INACTIVE' || u.accountStatus === 'SUSPENDED') && (
+                      <Tooltip text="Reactivar membresía">
+                        <button onClick={() => { setActivateTarget(u); setShowActivateModal(true); }}
+                                className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                          <Zap size={15} />
+                        </button>
+                      </Tooltip>
+                    )}
+                    <Tooltip text="Editar información del usuario">
+                      <button onClick={() => openEdit(u)}
+                              className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition">
+                        <Pencil size={15} />
+                      </button>
+                    </Tooltip>
                     {u.role !== 'ADMIN' && (
-                      <button onClick={() => handleDelete(u.id)} title="Eliminar"
-                              className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
-                        <Trash2 size={15} />
-                      </button>
+                      <Tooltip text="Eliminar usuario del sistema">
+                        <button onClick={() => handleDelete(u.id)}
+                                className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                          <Trash2 size={15} />
+                        </button>
+                      </Tooltip>
                     )}
                   </div>
                 </td>
               </tr>
             ))}
             {users.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400">No hay usuarios</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-400">No hay usuarios</td></tr>
             )}
           </tbody>
         </table>
@@ -263,6 +396,17 @@ export default function UsersManager() {
                 <option value="ADMIN">ADMIN</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Activación {editData && <span className="text-gray-400 font-normal">(dejar igual para no cambiar plazos)</span>}
+              </label>
+              <select className="input-field" value={form.accessType || ''} onChange={e => setForm({ ...form, accessType: e.target.value })}>
+                <option value="">-- Sin activación inmediata --</option>
+                <option value="ONE_DAY">1 Día</option>
+                <option value="THIRTY_DAYS">30 Días</option>
+                <option value="PERMANENT">Permanente</option>
+              </select>
+            </div>
             <div className="flex gap-3 pt-2">
               <button type="submit" className="btn-primary flex items-center gap-2">
                 <Check size={16} /> {editData ? 'Actualizar' : 'Crear'}
@@ -272,6 +416,32 @@ export default function UsersManager() {
           </form>
         </Modal>
       )}
+
+      {/* Activate Modal */}
+      {showActivateModal && activateTarget && (
+        <Modal title="Confirmar Pago y Membresía" onClose={() => setShowActivateModal(false)}>
+          <form onSubmit={handleActivateSubmit} className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              ¿Por cuánto tiempo deseas activar la membresía de <b>{activateTarget.name}</b>?
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Acceso</label>
+              <select className="input-field" value={activateType} onChange={(e) => setActivateType(e.target.value)}>
+                <option value="ONE_DAY">1 Día</option>
+                <option value="THIRTY_DAYS">30 Días</option>
+                <option value="PERMANENT">Permanente</option>
+              </select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="submit" className="btn-primary flex items-center gap-2">
+                <Check size={16} /> Activar
+              </button>
+              <button type="button" onClick={() => setShowActivateModal(false)} className="btn-secondary">Cancelar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as loginApi, register as registerApi } from '../services/api';
+import { login as loginApi, register as registerApi, getMe, logoutUser } from '../services/api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
@@ -10,56 +10,62 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session from localStorage
+  // Restore session via HttpOnly Cookie using /auth/me endpoint
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const name = localStorage.getItem('userName');
-    const email = localStorage.getItem('userEmail');
-    const role = localStorage.getItem('userRole');
-    const userId = localStorage.getItem('userId');
-    if (token && email) {
-      setUser({ token, name, email, role, userId });
-    }
-    setLoading(false);
+    const fetchSession = async () => {
+      try {
+        const res = await getMe();
+        const { email, name, role, userId } = res.data;
+        setUser({ email, name, role, userId });
+      } catch (error) {
+        // If 401, no valid session cookie exists
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSession();
   }, []);
 
   const login = async (email, password) => {
     const res = await loginApi({ email, password });
-    const { token, name, role, userId } = res.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('userName', name);
-    localStorage.setItem('userEmail', email);
-    localStorage.setItem('userRole', role);
-    localStorage.setItem('userId', userId);
-    setUser({ token, name, email, role, userId });
+    // Token is now set securely via Set-Cookie header. We just save user info.
+    const { name, role, userId } = res.data;
+    setUser({ email, name, role, userId });
+    
+    // Log telemetry
+    try { await import('../services/api').then(m => m.telemetryLogin()); } catch (e) {}
+    
     return res.data;
   };
 
-  const registerUser = async (name, email, password) => {
-    const res = await registerApi({ name, email, password });
+  const registerUser = async (name, email, password, phone, captchaToken) => {
+    const res = await registerApi({ name, email, password, phone, captchaToken });
     // Registration no longer returns a token (account is PENDING)
     // Show appropriate message to the user
-    if (!res.data.token) {
+    if (!res.data.token && res.data.role !== 'ADMIN') { // Handle optional pending flow
       toast.success(
-        'Registro exitoso. Tu cuenta está pendiente de aprobación. Te enviaremos un correo cuando esté activa.',
+        'Su solicitud de incorporación fue ingresada exitosamente.',
         { duration: 6000 }
       );
       return { pending: true, ...res.data };
     }
-    // Fallback if token is returned (shouldn't happen with new flow)
-    const { token, role, userId } = res.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('userName', name);
-    localStorage.setItem('userEmail', email);
-    localStorage.setItem('userRole', role);
-    localStorage.setItem('userId', userId);
-    setUser({ token, name, email, role, userId });
+    // Fallback if auto-login occurs
+    const { role, userId } = res.data;
+    setUser({ email, name, role, userId });
     return res.data;
   };
 
-  const logout = () => {
-    localStorage.clear();
+  const logout = async () => {
+    try {
+      await import('../services/api').then(m => m.telemetryLogout());
+      await logoutUser();
+    } catch (e) {
+      console.error('Logout failed on server, clearing locally.');
+    }
     setUser(null);
+    // Optional: force a refresh or clean redirect 
+    window.location.href = '/login';
   };
 
   const isAdmin = user?.role === 'ADMIN';

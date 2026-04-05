@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import UsersManager from './admin/UsersManager';
 import ManualsManager from './admin/ManualsManager';
-import { BookOpen, Users } from 'lucide-react';
+import AccessLogsManager from './admin/AccessLogsManager';
+import ReportsManagement from './admin/ReportsManagement';
+import { BookOpen, Users, Activity, AlertTriangle } from 'lucide-react';
 
 function TabButton({ active, onClick, icon: Icon, label, id }) {
   return (
@@ -19,7 +21,7 @@ export default function AdminDashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Panel de Administración</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">Gestiona el contenido académico y los usuarios del sistema.</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">Gestiona el contenido académico, registros y los usuarios del sistema.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-8">
@@ -37,11 +39,28 @@ export default function AdminDashboard() {
           icon={Users} 
           label="Gestión de Usuarios" 
         />
+        <TabButton 
+          id="tab-logs" 
+          active={activeTab === 'logs'} 
+          onClick={() => setActiveTab('logs')} 
+          icon={Activity} 
+          label="Bitácora de Sesiones" 
+        />
+        <TabButton 
+          id="tab-reports" 
+          active={activeTab === 'reports'} 
+          onClick={() => setActiveTab('reports')} 
+          icon={AlertTriangle} 
+          label="Reportes de Errores" 
+        />
       </div>
 
       {/* RENDER ACTIVE MODULE */}
       <div className="animate-in slide-in-from-bottom-2 duration-300">
-        {activeTab === 'manuals' ? <ManualsManager /> : <UsersManager />}
+        {activeTab === 'manuals' && <ManualsManager />}
+        {activeTab === 'users' && <UsersManager />}
+        {activeTab === 'logs' && <AccessLogsManager />}
+        {activeTab === 'reports' && <ReportsManagement />}
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sun, Moon, GraduationCap, LayoutDashboard, Shield, LogOut } from 'lucide-react';
+import { Sun, Moon, GraduationCap, LayoutDashboard, Shield, LogOut, User } from 'lucide-react';
 import { useState } from 'react';
+import Tooltip from './Tooltip';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
@@ -47,8 +48,13 @@ export default function Navbar() {
                 <LayoutDashboard size={16} /> Mi Progreso
               </Link>
 
-              <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500">|</span>
-              <span className="hidden md:inline text-sm text-gray-500 dark:text-gray-400">{user.name}</span>
+              <Tooltip text="Gestiona tu cuenta y suscripción" position="bottom">
+                <Link to="/profile"
+                      className="flex items-center gap-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-violet-600 dark:hover:text-violet-400 transition">
+                  <User size={16} className="hidden md:inline" />
+                  <span className="hidden md:inline">{user.name}</span>
+                </Link>
+              </Tooltip>
             </>
           )}
 

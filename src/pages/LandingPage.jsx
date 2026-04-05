@@ -86,7 +86,7 @@ export default function LandingPage() {
                 <>
                   <button
                     id="hero-register"
-                    onClick={() => navigate('/login')}
+                    onClick={() => navigate('/login?tab=register')}
                     className="px-8 py-4 rounded-2xl bg-white text-violet-700 font-bold text-lg shadow-xl shadow-black/20 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300"
                   >
                     Comenzar Gratis

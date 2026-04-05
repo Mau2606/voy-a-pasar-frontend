@@ -1,19 +1,23 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { GraduationCap, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import ReCaptcha, { resetCaptchaRef } from '../components/ReCaptcha';
 
 
 export default function LoginPage() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(searchParams.get('tab') !== 'register');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');   // ← inline error banner
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
 
   const handleChange = (e) => {
     setErrorMsg('');
@@ -25,14 +29,18 @@ export default function LoginPage() {
     setErrorMsg('');
     setLoading(true);
     try {
-      let userData;
       if (isLogin) {
-        userData = await login(form.email, form.password);
+        const userData = await login(form.email, form.password);
+        toast.success(`¡Bienvenido, ${userData.name}!`);
+        navigate(userData.role === 'ADMIN' ? '/admin' : '/dashboard', { replace: true });
       } else {
-        userData = await register(form.name, form.email, form.password);
+        await register(form.name, form.email, form.password, form.phone, captchaToken);
+        toast.success('Registro exitoso. Tu cuenta está pendiente de aceptación por el administrador.');
+        setIsLogin(true);
+        setForm({ ...form, password: '' });
+        setCaptchaToken('');
+        resetCaptchaRef(captchaRef);
       }
-      toast.success(`¡Bienvenido, ${userData.name}!`);
-      navigate(userData.role === 'ADMIN' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
       // Show inline error + centered toast
       const msg =
@@ -44,6 +52,8 @@ export default function LoginPage() {
         'Ocurrió un error inesperado. Inténtalo de nuevo.';
       setErrorMsg(msg);
       toast.error(msg);
+      resetCaptchaRef(captchaRef);
+      setCaptchaToken('');
     } finally {
       setLoading(false);
     }
@@ -52,7 +62,9 @@ export default function LoginPage() {
   const switchTab = (toLogin) => {
     setIsLogin(toLogin);
     setErrorMsg('');
-    setForm({ name: '', email: '', password: '' });
+    setForm({ name: '', email: '', password: '', phone: '' });
+    setCaptchaToken('');
+    resetCaptchaRef(captchaRef);
   };
 
   return (
@@ -95,11 +107,20 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div className="relative">
-                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input id="input-name" name="name" type="text" placeholder="Nombre completo" required
-                       value={form.name} onChange={handleChange}
-                       className="input-field pl-10" />
+              <div className="space-y-4">
+                <div className="relative">
+                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input id="input-name" name="name" type="text" placeholder="Nombre completo" required
+                         value={form.name} onChange={handleChange}
+                         className="input-field pl-10" />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">+56</span>
+                  <input id="input-phone" name="phone" type="tel" placeholder="9 1234 5678" required
+                         pattern="^9\d{8}$" title="Debe contener 9 dígitos y empezar con 9"
+                         value={form.phone} onChange={handleChange}
+                         className="input-field pl-12" />
+                </div>
               </div>
             )}
             <div className="relative">
@@ -129,7 +150,18 @@ export default function LoginPage() {
               </div>
             )}
 
-            <button id="btn-submit" type="submit" disabled={loading}
+            {/* reCAPTCHA — only for register */}
+            {!isLogin && (
+              <div className="pt-1">
+                <ReCaptcha
+                  captchaRef={captchaRef}
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken('')}
+                />
+              </div>
+            )}
+
+            <button id="btn-submit" type="submit" disabled={loading || (!isLogin && !captchaToken)}
                     className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
               {loading ? (
                 <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" />

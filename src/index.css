@@ -131,4 +131,14 @@
     from { box-shadow: 0 0 20px rgba(124, 58, 237, 0.15); }
     to { box-shadow: 0 0 40px rgba(124, 58, 237, 0.35); }
   }
+
+  /* Slide up animation for mobile bottom sheets */
+  .animate-slide-up {
+    animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
 }
